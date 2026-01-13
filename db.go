@@ -52,7 +52,7 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 	}
 	// check does user already exists		
 	var existinguser User
-	if usrerro := h.DB.Where("username = ?",req.Email).Find(&existinguser); usrerro.Error != nil {
+	if usrerro := h.DB.Where("name = ?",req.Username).Find(&existinguser); usrerro.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error getting user for existing check",
 			"success": "false",
@@ -65,7 +65,6 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 			"success": "false",
 		})	
 	}
-	// hash the password and store the user in db 
 	hashp,err := HashPassword(req.Password)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -74,7 +73,6 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 		})		
 	}
 
-	//TODO: create a new user and store it in the db	
 	user := User{
 		Name: req.Username,
 		Email: req.Email,
@@ -83,6 +81,19 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 	}
 
 	// store in the db	
-	h.DB.Create(user)
-	return nil 
+	if cerr := h.DB.Create(&user); cerr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error creating user",
+			"success": "false",
+		})				
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message": "user created",
+		"success": "true",
+		"id" : user.ID,
+		"name" : user.Name,
+		"email" : user.Email,
+		"role" : user.Role,
+	})
 }
