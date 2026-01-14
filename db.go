@@ -318,3 +318,66 @@ func (h *handler) AddStudentToClass(c fiber.Ctx) error {
 		"success":   "true",
 	})
 }
+
+func (h *handler) GetClassDetails(c fiber.Ctx) error {
+	classId := c.Params("id")
+	if after, ok :=strings.CutPrefix(classId, ":id="); ok  {
+		classId = after
+	}
+	idInt, err := strconv.Atoi(classId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "invalid class id",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+	userid := c.Locals("userid")
+	var class Class
+	if cerr := h.DB.First(&class,idInt); cerr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting class",
+			"success": "false",
+		})
+	}
+
+	// NOTE ---> we dont need to fetch all the students here just to check if the user is part of the class change this later
+	students := []User{}
+	if serr := h.DB.Model(&class).Association("Students").Find(&students); serr != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting students of class",
+			"success": "false",
+		})
+	}
+
+	if len(students) == 0 {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			
+		})
+	}
+	if class.TeacherID != userid.(uint) {
+		for _, student := range students {
+			if student.ID == userid.(uint) {
+				return c.Status(fiber.StatusOK).JSON(fiber.Map{
+					"Message":   "class details",
+					"success":   "true",
+					"classname": class.ClassName,
+					"teacherid": class.TeacherID,
+					"students":  students,
+				})
+			}else {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"Message": "error user is not authorized to view this class",
+					"success": "false",
+				})
+			}
+		}
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message":   "class details",
+		"success":   "true",
+		"classname": class.ClassName,
+		"teacherid": class.TeacherID,
+		"students":  students,
+	})
+}

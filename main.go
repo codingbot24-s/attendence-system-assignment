@@ -19,6 +19,7 @@ func main() {
 	class.Use(authMiddleware)
 	class.Post("/createclass", h.CreateClass)
 	class.Post("/:id/addstudent",h.AddStudentToClass)
+	class.Get("/:id",h.GetClassDetails)
 	fmt.Println("server started on 3000")
 	r.Listen(":3000")
 }
