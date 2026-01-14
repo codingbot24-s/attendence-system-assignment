@@ -381,3 +381,33 @@ func (h *handler) GetClassDetails(c fiber.Ctx) error {
 		"students":  students,
 	})
 }
+
+
+func (h *handler) GetAllStudets(c fiber.Ctx) error {
+	teacherId := c.Locals("userid").(uint)
+	var teacher User
+	if terr :=  h.DB.First(&teacher, teacherId); terr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting teacher",
+			"success": "false",
+		})
+	}
+	if teacher.Role != "teacher" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "user is not a teacher",
+			"success": "false",
+		})
+	}
+	students := []User{}
+	if serr := h.DB.Where("role = ?", "student").Find(&students); serr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting students",
+			"success": "false",
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message":  "students fetched successfully",
+		"success":  "true",
+		"students": students,
+	})
+}
