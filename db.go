@@ -97,3 +97,58 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 		"role" : user.Role,
 	})
 }
+
+type LoginReq struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+func (h *handler) Login(c fiber.Ctx) error {
+
+	var req LoginReq
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error parsing body",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+	
+	var user User
+	if usrerro := h.DB.Where("Email = ?", req.Email).Find(&user); usrerro.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting user for existing check",
+			"success": "false",
+		})		
+	}
+	if user.ID == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "user does not exist",
+			"success": "false",
+		})	
+	}
+	
+	if !VerifyPassword(req.Password, user.Password) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "invalid password",
+			"success": "false",
+			
+		})	
+	}
+
+	
+	token, err := CreateJWTToken(user.ID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error creating jwt token",
+			"success": "false",
+		})			
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message": "login successful",
+		"success": "true",
+		"token": token,
+	})
+}
+
+
