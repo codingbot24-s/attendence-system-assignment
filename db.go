@@ -179,3 +179,65 @@ func (h *handler) GetMe(c fiber.Ctx) error {
 		"email":   user.Email,
 	})
 }
+
+func (h *handler) checkTeacher(userId uint) (*User, error) {
+	var user User
+	res := h.DB.First(&user, userId)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if user.Role != "teacher" {
+		return nil, fmt.Errorf("user is not a teacher")
+	}else {
+		return &user, nil
+	}
+}
+
+
+type CreateClassReq struct {
+	ClassName string `json:"className"`
+}
+
+func (h *handler) CreateClass(c fiber.Ctx) error {
+	fmt.Println("create class started")
+	var req CreateClassReq
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error parsing body",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}	
+	userid := c.Locals("userid")
+	teacher,err := h.checkTeacher(userid.(uint))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error user is not a teacher",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+
+	class := Class{
+		ClassName: req.ClassName,
+		TeacherID: teacher.ID,
+	}
+
+	if cerr := h.DB.Create(&class); cerr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error creating class",
+			"success": "false",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message": "class created",
+		"success": "true",
+		"id":      class.ID,
+		"name":    class.ClassName,
+		"teacher": teacher.ID,
+		"students": class.Students,
+	})
+
+
+}
