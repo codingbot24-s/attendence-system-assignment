@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/driver/postgres"
@@ -152,7 +154,6 @@ func (h *handler) Login(c fiber.Ctx) error {
 }
 
 func (h *handler) GetMe(c fiber.Ctx) error {
-	
 
 	userId := c.Locals("userid")
 
@@ -188,11 +189,10 @@ func (h *handler) checkTeacher(userId uint) (*User, error) {
 	}
 	if user.Role != "teacher" {
 		return nil, fmt.Errorf("user is not a teacher")
-	}else {
+	} else {
 		return &user, nil
 	}
 }
-
 
 type CreateClassReq struct {
 	ClassName string `json:"className"`
@@ -207,9 +207,9 @@ func (h *handler) CreateClass(c fiber.Ctx) error {
 			"success": "false",
 			"error":   err.Error(),
 		})
-	}	
+	}
 	userid := c.Locals("userid")
-	teacher,err := h.checkTeacher(userid.(uint))
+	teacher, err := h.checkTeacher(userid.(uint))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error user is not a teacher",
@@ -231,13 +231,90 @@ func (h *handler) CreateClass(c fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Message": "class created",
-		"success": "true",
-		"id":      class.ID,
-		"name":    class.ClassName,
-		"teacher": teacher.ID,
+		"Message":  "class created",
+		"success":  "true",
+		"id":       class.ID,
+		"name":     class.ClassName,
+		"teacher":  teacher.ID,
 		"students": class.Students,
 	})
+}
 
+type AddStudentReq struct {
+	StudentID uint `json:"studentId"`
+}
 
+/*
+// 1. check if class exist
+// 2. check if user is teacher of that class
+// 3. check if student exist
+*/
+func (h *handler) AddStudentToClass(c fiber.Ctx) error {
+	var req AddStudentReq
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error parsing body",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+	classId := c.Params("id")
+	if after, ok :=strings.CutPrefix(classId, ":id="); ok  {
+		classId = after
+	}
+	idInt, err := strconv.Atoi(classId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "invalid class id",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+
+	var class Class
+	res := h.DB.First(&class, idInt)
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"Message": "class not found",
+				"success": "false",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Message": "error getting class",
+			"success": "false",
+		})
+	}
+
+	teacherId := c.Locals("userid")
+	if class.TeacherID != teacherId.(uint) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error user is not the teacher of this class",
+			"success": "false",
+		})
+	}
+
+	var student User
+	if serr := h.DB.First(&student, req.StudentID); serr.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting student",
+			"success": "false",
+		})
+	}
+	// add student to class
+	if aerr := h.DB.Model(&class).Association("Students").Append(&student); aerr != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error adding student to class",
+			"success": "false",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message":   "student added to class",
+		"classname": class.ClassName,
+		"teacherid": class.TeacherID,
+		"studentid": student.ID,
+		"students":  class.Students,
+		"success":   "true",
+	})
 }

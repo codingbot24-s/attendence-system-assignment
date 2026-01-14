@@ -18,7 +18,7 @@ func main() {
 	class := r.Group("/class")
 	class.Use(authMiddleware)
 	class.Post("/createclass", h.CreateClass)
-
+	class.Post("/:id/addstudent",h.AddStudentToClass)
 	fmt.Println("server started on 3000")
 	r.Listen(":3000")
 }
