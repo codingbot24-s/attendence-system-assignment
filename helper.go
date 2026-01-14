@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -24,7 +26,7 @@ type MyCustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// TODO: NOTE ---> change this to userid
+// TODO: NOTE ---> change th`is to userid
 func CreateJWTToken(userId uint) (string, error) {
 
 	claims := MyCustomClaims{
@@ -56,4 +58,26 @@ func verifyToken(tokenString string) (*MyCustomClaims, error) {
 	}
 
 	return claims, nil
+}
+
+func authMiddleware(c fiber.Ctx) error {
+		
+	authHeader := c.Get("Authorization")
+
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Missing or invalid authorization header",
+		})
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	claims, err := verifyToken(token)
+	if err != nil || claims == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "invalid or expired token",
+		})
+	}
+	c.Locals("userid", claims.UserId)
+	
+	return c.Next()
 }

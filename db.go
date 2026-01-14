@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -50,9 +51,9 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 			"error":   err.Error(),
 		})
 	}
-	// check does user already exists		
+	// check does user already exists
 	var existinguser User
-	if usrerro := h.DB.Where("name = ?",req.Username).Find(&existinguser); usrerro.Error != nil {
+	if usrerro := h.DB.Where("name = ?", req.Username).Find(&existinguser); usrerro.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error getting user for existing check",
 			"success": "false",
@@ -63,38 +64,38 @@ func (h *handler) CreateUser(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error user with gmail already exist`",
 			"success": "false",
-		})	
+		})
 	}
-	hashp,err := HashPassword(req.Password)
+	hashp, err := HashPassword(req.Password)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error hashing password`",
 			"success": "false",
-		})		
+		})
 	}
 
 	user := User{
-		Name: req.Username,
-		Email: req.Email,
+		Name:     req.Username,
+		Email:    req.Email,
 		Password: hashp,
-		Role: req.Role,
+		Role:     req.Role,
 	}
 
-	// store in the db	
+	// store in the db
 	if cerr := h.DB.Create(&user); cerr.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error creating user",
 			"success": "false",
-		})				
+		})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"Message": "user created",
 		"success": "true",
-		"id" : user.ID,
-		"name" : user.Name,
-		"email" : user.Email,
-		"role" : user.Role,
+		"id":      user.ID,
+		"name":    user.Name,
+		"email":   user.Email,
+		"role":    user.Role,
 	})
 }
 
@@ -102,6 +103,7 @@ type LoginReq struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+
 func (h *handler) Login(c fiber.Ctx) error {
 
 	var req LoginReq
@@ -112,43 +114,68 @@ func (h *handler) Login(c fiber.Ctx) error {
 			"error":   err.Error(),
 		})
 	}
-	
+
 	var user User
 	if usrerro := h.DB.Where("Email = ?", req.Email).Find(&user); usrerro.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error getting user for existing check",
 			"success": "false",
-		})		
+		})
 	}
 	if user.ID == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "user does not exist",
 			"success": "false",
-		})	
+		})
 	}
-	
+
 	if !VerifyPassword(req.Password, user.Password) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "invalid password",
 			"success": "false",
-			
-		})	
+		})
 	}
 
-	
 	token, err := CreateJWTToken(user.ID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error creating jwt token",
 			"success": "false",
-		})			
+		})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"Message": "login successful",
 		"success": "true",
-		"token": token,
+		"token":   token,
 	})
 }
 
+func (h *handler) GetMe(c fiber.Ctx) error {
+	
 
+	userId := c.Locals("userid")
+
+	var user User
+	res := h.DB.First(&user, userId)
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"Message": "user not found",
+				"success": "false",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Message": "error getting user",
+			"success": "false",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"Message": "getting user successful",
+		"success": "true",
+		"id":      user.ID,
+		"name":    user.Name,
+		"email":   user.Email,
+	})
+}
