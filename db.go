@@ -480,7 +480,7 @@ type ActiveSession struct {
 	ClassId  string 
 	StartedAt int64
 	// Attendance is map
-	
+	Session  map[uint]string 
 }
 
 
@@ -525,6 +525,6 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 
 	// TODO: Implement attendance start logic here
 
-
+	
 	return nil
 }
