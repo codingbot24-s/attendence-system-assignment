@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v3"
 )
 
