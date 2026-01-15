@@ -201,7 +201,6 @@ type CreateClassReq struct {
 }
 
 func (h *handler) CreateClass(c fiber.Ctx) error {
-	fmt.Println("create class started")
 	var req CreateClassReq
 	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -549,6 +548,5 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 		}
 		fmt.Printf("received message: %s\n", msg)
 
-		
 	}
 }

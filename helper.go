@@ -83,9 +83,34 @@ func authMiddleware(c fiber.Ctx) error {
 	return c.Next()
 }
 
+
+
+type WsUser struct {
+	UserId uint
+	Role string
+}
+
 func UpgradeGuard() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
+			token := c.Query("token")
+			if token == "" {
+				// 1. --> extract the query params
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"success" : "false",
+					"message" : "no token",
+				})
+			}
+			// 2. --> Verify JWT 
+			_,err := verifyToken(token)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"success" : "false",
+					"message" : "invalid token",
+				})
+			}
+			// 3. --> Attach user info to websocket 
+
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
