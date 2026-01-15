@@ -259,7 +259,7 @@ func (h *handler) AddStudentToClass(c fiber.Ctx) error {
 		})
 	}
 	classId := c.Params("id")
-	if after, ok :=strings.CutPrefix(classId, ":id="); ok  {
+	if after, ok := strings.CutPrefix(classId, ":id="); ok {
 		classId = after
 	}
 	idInt, err := strconv.Atoi(classId)
@@ -321,7 +321,7 @@ func (h *handler) AddStudentToClass(c fiber.Ctx) error {
 
 func (h *handler) GetClassDetails(c fiber.Ctx) error {
 	classId := c.Params("id")
-	if after, ok :=strings.CutPrefix(classId, ":id="); ok  {
+	if after, ok := strings.CutPrefix(classId, ":id="); ok {
 		classId = after
 	}
 	idInt, err := strconv.Atoi(classId)
@@ -334,7 +334,7 @@ func (h *handler) GetClassDetails(c fiber.Ctx) error {
 	}
 	userid := c.Locals("userid")
 	var class Class
-	if cerr := h.DB.First(&class,idInt); cerr.Error != nil {
+	if cerr := h.DB.First(&class, idInt); cerr.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error getting class",
 			"success": "false",
@@ -351,9 +351,7 @@ func (h *handler) GetClassDetails(c fiber.Ctx) error {
 	}
 
 	if len(students) == 0 {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{})
 	}
 	if class.TeacherID != userid.(uint) {
 		for _, student := range students {
@@ -365,7 +363,7 @@ func (h *handler) GetClassDetails(c fiber.Ctx) error {
 					"teacherid": class.TeacherID,
 					"students":  students,
 				})
-			}else {
+			} else {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 					"Message": "error user is not authorized to view this class",
 					"success": "false",
@@ -382,11 +380,10 @@ func (h *handler) GetClassDetails(c fiber.Ctx) error {
 	})
 }
 
-
 func (h *handler) GetAllStudets(c fiber.Ctx) error {
 	teacherId := c.Locals("userid").(uint)
 	var teacher User
-	if terr :=  h.DB.First(&teacher, teacherId); terr.Error != nil {
+	if terr := h.DB.First(&teacher, teacherId); terr.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"Message": "error getting teacher",
 			"success": "false",
@@ -410,4 +407,124 @@ func (h *handler) GetAllStudets(c fiber.Ctx) error {
 		"success":  "true",
 		"students": students,
 	})
+}
+
+// TODO: TEST THIS ROUTE
+func (h *handler) GetMyAttendance(c fiber.Ctx) error {
+	classId := c.Params("id")
+	if after, ok := strings.CutPrefix(classId, ":id="); ok {
+		classId = after
+
+	}
+	idInt, err := strconv.Atoi(classId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "invalid class id",
+			"success": "false",
+			"error":   err.Error(),
+		})
+	}
+	// check if class exist
+	var class Class
+	if cerr := h.DB.First(&class, idInt); cerr.Error != nil {
+		if errors.Is(cerr.Error, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"Message": "class not found",
+				"success": "false",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Message": "error getting class",
+			"success": "false",
+		})
+	}
+
+	studentId := c.Locals("userid").(uint)
+
+	
+	// Get attendance for this class and student
+	var attendance Attendance
+	res := h.DB.Where("class_id = ? AND student_id = ?", idInt, studentId).First(&attendance)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"success": true,
+			"data": fiber.Map{
+				"classId": idInt,
+				"status":  nil,
+			},
+		})
+	}
+
+	if res.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Message": "error getting attendance",
+			"success": "false",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"classId": idInt,
+			"status":  attendance.Status,
+		},
+	})
+}
+
+type attendanceReq struct {
+	ClassId string `json:"classid"`
+}
+
+
+type ActiveSession struct {
+	ClassId  string 
+	StartedAt int64
+	// Attendance is map
+	
+}
+
+
+func (h *handler) StartAttendance(c fiber.Ctx) error {
+	userId := c.Locals("userid").(uint)
+	var teacher User
+	if t := h.DB.First(&teacher, userId); t.Error != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error getting user",
+			"success": "false",
+		})
+	}
+	if teacher.Role != "teacher" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"Message": "error user is not teacher",
+			"success": "false",
+		})
+	}
+
+	var req attendanceReq
+	if b := c.Bind().Body(&req); b.Error != nil {
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"message": "error parsing body",
+			"suceess": "false",
+		})
+	}
+
+	var class Class
+	if dbclass := h.DB.First(&class, req.ClassId); dbclass.Error != nil {
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"message": "error parsing body",
+			"suceess": "false",
+		})
+	}
+
+	if class.ID == 0 {
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"message": "class not exist with this id",
+			"suceess": "false",
+		})
+	}
+
+	// TODO: Implement attendance start logic here
+
+
+	return nil
 }

@@ -21,6 +21,8 @@ func main() {
 	class.Post("/:id/addstudent",h.AddStudentToClass)
 	class.Get("/students",h.GetAllStudets)
 	class.Get("/:id/class",h.GetClassDetails)
+	class.Get("/:id/my-attendance",h.GetMyAttendance)
+	class.Post("/attendance/start",authMiddleware,)
 	fmt.Println("server started on 3000")
 	r.Listen(":3000")
 }
