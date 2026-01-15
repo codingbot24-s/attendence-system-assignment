@@ -13,7 +13,7 @@ func main() {
 	r := fiber.New()
 
 	r.Post("/auth/signup", h.CreateUser)
-	r.Post("/auth/lo	gin", h.Login)
+	r.Post("/auth/login", h.Login)
 	r.Get("/auth/me", authMiddleware, h.GetMe)
 
 	class := r.Group("/class")
