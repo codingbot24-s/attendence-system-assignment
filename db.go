@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/driver/postgres"
@@ -477,7 +478,7 @@ type attendanceReq struct {
 
 
 type ActiveSession struct {
-	ClassId  string 
+	ClassId  uint
 	StartedAt int64
 	// Attendance is map
 	Session  map[uint]string 
@@ -501,7 +502,7 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 	}
 
 	var req attendanceReq
-	if b := c.Bind().Body(&req); b.Error != nil {
+	if bindErr := c.Bind().Body(&req); bindErr != nil {
 		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
 			"message": "error parsing body",
 			"suceess": "false",
@@ -523,8 +524,18 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Implement attendance start logic here
+	// start attendance session in memory
+	ac :=ActiveSession {
+		ClassId: class.ID,
+		StartedAt: time.Now().Unix(),
+		Session: make(map[uint]string),
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success" : "true",
+		"data" : fiber.Map{
+			"classid" : class.ID,
+			"startedAt": ac.StartedAt,
+		},
 
-	
-	return nil
+	})
 }

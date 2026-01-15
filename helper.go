@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
-
 	"github.com/gofiber/fiber/v3"
+    "github.com/gofiber/contrib/v3/websocket"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -82,3 +82,12 @@ func authMiddleware(c fiber.Ctx) error {
 	return c.Next()
 }
 
+func UpgradeGuard() fiber.Handler {
+	return func (c fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			c.Locals("allowed", "true")
+			c.Next()	
+		}
+		return fiber.ErrUpgradeRequired
+	}
+}

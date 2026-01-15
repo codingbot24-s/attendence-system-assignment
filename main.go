@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -18,11 +19,14 @@ func main() {
 	class := r.Group("/class")
 	class.Use(authMiddleware)
 	class.Post("/createclass", h.CreateClass)
-	class.Post("/:id/addstudent",h.AddStudentToClass)
-	class.Get("/students",h.GetAllStudets)
-	class.Get("/:id/class",h.GetClassDetails)
-	class.Get("/:id/my-attendance",h.GetMyAttendance)
-	class.Post("/attendance/start",authMiddleware,)
+	class.Post("/:id/addstudent", h.AddStudentToClass)
+	class.Get("/students", h.GetAllStudets)
+	class.Get("/:id/class", h.GetClassDetails)
+	class.Get("/:id/my-attendance", h.GetMyAttendance)
+	class.Post("/attendance/start", authMiddleware)
+
+	r.Use("/ws",UpgradeGuard())
+
 	fmt.Println("server started on 3000")
 	r.Listen(":3000")
 }
