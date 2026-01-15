@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -442,7 +443,6 @@ func (h *handler) GetMyAttendance(c fiber.Ctx) error {
 
 	studentId := c.Locals("userid").(uint)
 
-	
 	// Get attendance for this class and student
 	var attendance Attendance
 	res := h.DB.Where("class_id = ? AND student_id = ?", idInt, studentId).First(&attendance)
@@ -476,14 +476,12 @@ type attendanceReq struct {
 	ClassId string `json:"classid"`
 }
 
-
 type ActiveSession struct {
-	ClassId  uint
+	ClassId   uint
 	StartedAt int64
 	// Attendance is map
-	Session  map[uint]string 
+	Session map[uint]string
 }
-
 
 func (h *handler) StartAttendance(c fiber.Ctx) error {
 	userId := c.Locals("userid").(uint)
@@ -525,17 +523,32 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 	}
 
 	// start attendance session in memory
-	ac :=ActiveSession {
-		ClassId: class.ID,
+	ac := ActiveSession{
+		ClassId:   class.ID,
 		StartedAt: time.Now().Unix(),
-		Session: make(map[uint]string),
+		Session:   make(map[uint]string),
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"success" : "true",
-		"data" : fiber.Map{
-			"classid" : class.ID,
+		"success": "true",
+		"data": fiber.Map{
+			"classid":   class.ID,
 			"startedAt": ac.StartedAt,
 		},
-
 	})
+}
+
+func (h *handler) HandleWebSocket(c *websocket.Conn) {
+	fmt.Println("client connected successfully")
+	c.WriteMessage(websocket.TextMessage, []byte("Connected to attendance system"))
+
+	for {
+		_, msg, err := c.ReadMessage()
+		if err != nil {
+			fmt.Println("error reading message:", err)
+			break
+		}
+		fmt.Printf("received message: %s\n", msg)
+
+		
+	}
 }

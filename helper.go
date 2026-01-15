@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
-    "github.com/gofiber/contrib/v3/websocket"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -61,7 +62,7 @@ func verifyToken(tokenString string) (*MyCustomClaims, error) {
 }
 
 func authMiddleware(c fiber.Ctx) error {
-		
+
 	authHeader := c.Get("Authorization")
 
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -78,15 +79,14 @@ func authMiddleware(c fiber.Ctx) error {
 		})
 	}
 	c.Locals("userid", claims.UserId)
-	
+
 	return c.Next()
 }
 
 func UpgradeGuard() fiber.Handler {
-	return func (c fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
-			c.Locals("allowed", "true")
-			c.Next()	
+			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
 	}
