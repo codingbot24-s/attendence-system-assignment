@@ -483,6 +483,8 @@ type ActiveSession struct {
 	Attendance map[uint]string
 }
 
+var ac *ActiveSession
+
 func (h *handler) StartAttendance(c fiber.Ctx) error {
 	userId := c.Locals("userid").(uint)
 	var teacher User
@@ -523,11 +525,12 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 	}
 
 	// start attendance session in memory
-	ac := ActiveSession{
-		ClassId:   class.ID,
-		StartedAt: time.Now().Unix(),
-		Attendance:   make(map[uint]string),
-	}
+
+	ac.ClassId = class.ID
+	ac.StartedAt = time.Now().Unix()
+	ac.Attendance = make(map[uint]string)
+
+	
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": "true",
 		"data": fiber.Map{

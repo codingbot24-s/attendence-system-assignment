@@ -107,10 +107,12 @@ func UpgradeGuard() fiber.Handler {
 					"message": "invalid token",
 				})
 			}
+
 			// 3. --> Attach user info to websocket
+			// TODO: change the claims for dynamiclly for user and teacher we can do it by fetching the user from db and we can set the role of that user 
 			c.Locals("wsuser", &WsUser{
 				UserId: claims.UserId,
-				Role:   "student",
+				Role:   "teacher",
 			})
 			return c.Next()
 		}
@@ -118,17 +120,29 @@ func UpgradeGuard() fiber.Handler {
 	}
 }
 
-
 type Data struct {
 	StudentId string
 	Status    string
 }
 
-func AMarkedHandler (c *websocket.Conn, data* Data) {
-	fmt.Println("attendance marker called")
+func AMarkedHandler(c *websocket.Conn, data *Data) error {
+	fmt.Println("called amarked")
+	user := c.Locals("wsuser")
+	ws, ok := user.(*WsUser)
+	if !ok || ws == nil {
+		return fmt.Errorf("wsuser missing or wrong type")
+	}
+	if ws.Role != "teacher" {
+		return fmt.Errorf("only teacher can take attendance")
+	}
+	if ac == nil {
+		return fmt.Errorf("start the attendance first")
+	}
+	fmt.Printf("user role is %s", ws.Role)
+	return nil
 }
 
-func Unmarshall(message []byte,c* websocket.Conn) error {
+func Unmarshall(message []byte, c *websocket.Conn) error {
 	var req Incoming
 	if err := json.Unmarshal(message, &req); err != nil {
 		return fmt.Errorf("error marshalling into strcut")
@@ -136,7 +150,7 @@ func Unmarshall(message []byte,c* websocket.Conn) error {
 
 	switch req.Event {
 	case "ATTENDANCE_MARKED":
-		// TODO: error here fix by marshall and unmarshall 
+		// TODO: error here fix by marshall and unmarshall
 		dataBytes, err := json.Marshal(req.Data)
 		if err != nil {
 			return fmt.Errorf("error marshalling data")
@@ -145,7 +159,12 @@ func Unmarshall(message []byte,c* websocket.Conn) error {
 		if err := json.Unmarshal(dataBytes, &data); err != nil {
 			return fmt.Errorf("error unmarshalling into data struct: %v", err)
 		}
-		AMarkedHandler(c,&data)
+		if err := AMarkedHandler(c, &data); err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("unknown event")
 	}
 
 	return nil
