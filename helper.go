@@ -107,8 +107,9 @@ func UpgradeGuard() fiber.Handler {
 					"message": "invalid token",
 				})
 			}
-
+		
 			// 3. --> Attach user info to websocket
+			// TODO: compelete this then test all websocket route
 			// TODO: change the claims for dynamiclly for user and teacher we can do it by fetching the user from db and we can set the role of that user
 			// how can we query db here
 			c.Locals("wsuser", &WsUser{
