@@ -480,7 +480,7 @@ type ActiveSession struct {
 	ClassId   uint
 	StartedAt int64
 	// Attendance is map
-	Session map[uint]string
+	Attendance map[uint]string
 }
 
 func (h *handler) StartAttendance(c fiber.Ctx) error {
@@ -526,7 +526,7 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 	ac := ActiveSession{
 		ClassId:   class.ID,
 		StartedAt: time.Now().Unix(),
-		Session:   make(map[uint]string),
+		Attendance:   make(map[uint]string),
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": "true",
@@ -560,6 +560,15 @@ func (c * Clients) addClients (client *websocket.Conn) {
 	fmt.Printf("len client %d", len(c.Client))
 }
 
+/*
+	TODO: 
+	1. need to create a diffrent message struct for dif events 
+	2. pass it to the diffrent handler
+*/ 
+type Message struct {
+	Event string 
+	StudentId string
+}
 
 func (h *handler) HandleWebSocket(c *websocket.Conn) {
 	c.WriteMessage(websocket.TextMessage, []byte("Connected to attendance system"))
@@ -578,7 +587,7 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 				break
 			}
 			fmt.Printf("received message: %s\n", msg)
-			fmt.Printf("starting broadcas")
+			
 			clients.message <- msg
 			// removed write 
 		}
@@ -588,7 +597,7 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 	// this is blocking
 	for msg := range clients.message {
 		for c := range clients.Client {
-			c.WriteMessage(websocket.TextMessage,[]byte(msg))
+			c.WriteMessage(websocket.TextMessage,msg)
 		}
 	}
 	// wg.Add(1)
