@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/contrib/v3/websocket"
@@ -536,17 +537,48 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 	})
 }
 
+var wg sync.WaitGroup
+
+type Clients struct {
+	Client map[*websocket.Conn]bool
+	message chan []byte
+}
+
 func (h *handler) HandleWebSocket(c *websocket.Conn) {
-	fmt.Println("client connected successfully")
-	c.WriteMessage(websocket.TextMessage, []byte("Connected to attendance system"))
+	counter := 0;
+	fmt.Printf("client connected successfully number of client is %d",counter)
 
-	for {
-		_, msg, err := c.ReadMessage()
-		if err != nil {
-			fmt.Println("error reading message:", err)
-			break
-		}
-		fmt.Printf("received message: %s\n", msg)
-
+	clients := &Clients{
+		Client: make(map[*websocket.Conn]bool),
+		message: make(chan []byte),
 	}
+	clients.Client[c] = true
+	fmt.Printf("len of map is %d",len(clients.Client))
+	c.WriteMessage(websocket.TextMessage, []byte("Connected to attendance system"))
+	// this is blocking so we need to run it in a goroutine
+	go func() {
+		
+		// defer wg.Done()
+		for {
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				fmt.Println("client disconnected:", err)
+				break
+			}
+			fmt.Printf("received message: %s\n", msg)
+			fmt.Printf("starting broadcas")
+			clients.message <- msg
+			// removed write 
+		}
+	}()
+
+
+	// this is blocking
+	for msg := range clients.message {
+		for c := range clients.Client {
+			c.WriteMessage(websocket.TextMessage,[]byte(msg))
+		}
+	}
+	// wg.Add(1)
+	// wg.Wait()
 }

@@ -27,7 +27,7 @@ type MyCustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// TODO: NOTE ---> change th`is to userid
+
 func CreateJWTToken(userId uint) (string, error) {
 
 	claims := MyCustomClaims{
@@ -102,15 +102,18 @@ func UpgradeGuard() fiber.Handler {
 				})
 			}
 			// 2. --> Verify JWT 
-			_,err := verifyToken(token)
+			claims,err := verifyToken(token)
 			if err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 					"success" : "false",
 					"message" : "invalid token",
-				})
+				})	
 			}
 			// 3. --> Attach user info to websocket 
-
+			c.Locals("wsuser", &WsUser{
+				UserId: claims.UserId,
+				Role: "student",
+			})
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
