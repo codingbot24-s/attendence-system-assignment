@@ -539,22 +539,34 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 
 var wg sync.WaitGroup
 
+
 type Clients struct {
 	Client map[*websocket.Conn]bool
 	message chan []byte
 }
+// NOTE NO MUTEX 
+var clients *Clients
 
-func (h *handler) HandleWebSocket(c *websocket.Conn) {
-	counter := 0;
-	fmt.Printf("client connected successfully number of client is %d",counter)
-
-	clients := &Clients{
+func New () *Clients {
+	return &Clients {
 		Client: make(map[*websocket.Conn]bool),
 		message: make(chan []byte),
 	}
-	clients.Client[c] = true
-	fmt.Printf("len of map is %d",len(clients.Client))
+}
+
+func (c * Clients) addClients (client *websocket.Conn) {
+	fmt.Println("adding client")
+	c.Client[client] = true
+	fmt.Printf("len client %d", len(c.Client))
+}
+
+
+func (h *handler) HandleWebSocket(c *websocket.Conn) {
 	c.WriteMessage(websocket.TextMessage, []byte("Connected to attendance system"))
+	if clients == nil {
+		clients = New()
+	}
+	clients.addClients(c)
 	// this is blocking so we need to run it in a goroutine
 	go func() {
 		
@@ -582,3 +594,4 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 	// wg.Add(1)
 	// wg.Wait()
 }
+// TODO: 
