@@ -109,7 +109,8 @@ func UpgradeGuard() fiber.Handler {
 			}
 
 			// 3. --> Attach user info to websocket
-			// TODO: change the claims for dynamiclly for user and teacher we can do it by fetching the user from db and we can set the role of that user 
+			// TODO: change the claims for dynamiclly for user and teacher we can do it by fetching the user from db and we can set the role of that user
+			// how can we query db here
 			c.Locals("wsuser", &WsUser{
 				UserId: claims.UserId,
 				Role:   "teacher",
@@ -121,12 +122,11 @@ func UpgradeGuard() fiber.Handler {
 }
 
 type Data struct {
-	StudentId string
-	Status    string
+	StudentId string `json:"studentId"`
+	Status    string `json:"status"`
 }
 
-func AMarkedHandler(c *websocket.Conn, data *Data) error {
-	fmt.Println("called amarked")
+func AMarkedHandler(c *websocket.Conn, data *Data, msg []byte) error {
 	user := c.Locals("wsuser")
 	ws, ok := user.(*WsUser)
 	if !ok || ws == nil {
@@ -135,10 +135,130 @@ func AMarkedHandler(c *websocket.Conn, data *Data) error {
 	if ws.Role != "teacher" {
 		return fmt.Errorf("only teacher can take attendance")
 	}
-	if ac == nil {
-		return fmt.Errorf("start the attendance first")
+	if ac.ClassId == 0 {
+		return fmt.Errorf("first start the attendance")
 	}
-	fmt.Printf("user role is %s", ws.Role)
+	fmt.Print("all checks have been passed")
+	ac.Attendance[data.StudentId] = data.Status
+
+	for client := range clients.Client {
+		client.WriteMessage(websocket.TextMessage, msg)
+	}
+	return nil
+}
+
+type Summary struct {
+	Event  string
+	Smdata SummaryData
+}
+
+type SummaryData struct {
+	Present int
+	Absent  int
+	Total   int
+}
+
+func SummaryHandler(c *websocket.Conn, data *Data) error {
+	user := c.Locals("wsuser")
+	ws, ok := user.(*WsUser)
+	if !ok || ws == nil {
+		return fmt.Errorf("wsuser missing or wrong type")
+	}
+	if ws.Role != "teacher" {
+		return fmt.Errorf("only teacher can take attendance")
+	}
+	if ac.ClassId == 0 {
+		return fmt.Errorf("first start the attendance")
+	}
+
+	var presentc int
+	var absentc int
+
+	for _, v := range ac.Attendance {
+		switch v {
+		case "present":
+			presentc += 1
+		case "absent":
+			absentc += 1
+		}
+	}
+
+	summary := Summary{
+		Event: "TODAY_SUMMARY",
+		Smdata: SummaryData{
+			Present: presentc,
+			Absent:  absentc,
+			Total:   presentc + absentc,
+		},
+	}
+
+	msg, err := json.Marshal(summary)
+	if err != nil {
+		return fmt.Errorf("summary reponse error ")
+	}
+
+	for client := range clients.Client {
+		client.WriteMessage(websocket.TextMessage, msg)
+	}
+	return nil
+}
+
+type AttendanceCheck struct {
+	Event string
+	adata AttendanceData
+}
+
+type AttendanceData struct {
+	Status string
+}
+
+func MyAttendanceHandler(c *websocket.Conn, data *Data) error {
+	user := c.Locals("wsuser")
+	ws, ok := user.(*WsUser)
+	if !ok || ws == nil {
+		return fmt.Errorf("wsuser missing or wrong type")
+	}
+	// note we dont have call to db for checking after that
+	// if ws.Role != "teacher" {
+	// 	return fmt.Errorf("only teacher can take attendance")
+	// }
+	if ac.ClassId == 0 {
+		return fmt.Errorf("attendance not started")
+	}
+	usrIDstr := fmt.Sprintf("%d", ws.UserId)
+
+	if _, ok := ac.Attendance[usrIDstr]; !ok {
+		return fmt.Errorf("error user with %d not in the attendance map ", ws.UserId)
+	}
+
+	status := ac.Attendance[usrIDstr]
+	switch status {
+	case "":
+		acc := AttendanceCheck{
+			Event: "MY_ATTENDANCE",
+			adata: AttendanceData{
+				Status: "not yet updated",
+			},
+		}
+		msg, err := json.Marshal(acc)
+		if err != nil {
+			return fmt.Errorf("marshall error in acc ")
+		}
+		c.Conn.WriteMessage(websocket.TextMessage, msg)
+	case "present":
+		acc := AttendanceCheck{
+			Event: "MY_ATTENDANCE",
+			adata: AttendanceData{
+				Status: status,
+			},
+		}
+		msg, err := json.Marshal(acc)
+		if err != nil {
+			return fmt.Errorf("summary reponse error ")
+		}
+		c.Conn.WriteMessage(websocket.TextMessage, msg)
+	}
+
 	return nil
 }
 
@@ -147,22 +267,28 @@ func Unmarshall(message []byte, c *websocket.Conn) error {
 	if err := json.Unmarshal(message, &req); err != nil {
 		return fmt.Errorf("error marshalling into strcut")
 	}
-
+	dataBytes, err := json.Marshal(req.Data)
+	if err != nil {
+		return fmt.Errorf("error marshalling data")
+	}
+	var data Data
+	if err := json.Unmarshal(dataBytes, &data); err != nil {
+		return fmt.Errorf("error unmarshalling into data struct: %v", err)
+	}
 	switch req.Event {
 	case "ATTENDANCE_MARKED":
-		// TODO: error here fix by marshall and unmarshall
-		dataBytes, err := json.Marshal(req.Data)
-		if err != nil {
-			return fmt.Errorf("error marshalling data")
+		if err := AMarkedHandler(c, &data, message); err != nil {
+			return err
 		}
-		var data Data
-		if err := json.Unmarshal(dataBytes, &data); err != nil {
-			return fmt.Errorf("error unmarshalling into data struct: %v", err)
-		}
-		if err := AMarkedHandler(c, &data); err != nil {
+	case "TODAY_SUMMARY":
+		if err := SummaryHandler(c, &data); err != nil {
 			return err
 		}
 
+	case "MY_ATTENDANCE":
+		if err := MyAttendanceHandler(c,&data); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown event")
 	}

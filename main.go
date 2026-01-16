@@ -15,6 +15,7 @@ func main() {
 	r.Post("/auth/signup", h.CreateUser)
 	r.Post("/auth/login", h.Login)
 	r.Get("/auth/me", authMiddleware, h.GetMe)
+	r.Post("/attendance/start", authMiddleware,h.StartAttendance)
 
 	class := r.Group("/class")
 	class.Use(authMiddleware)
@@ -23,7 +24,6 @@ func main() {
 	class.Get("/students", h.GetAllStudets)
 	class.Get("/:id/class", h.GetClassDetails)
 	class.Get("/:id/my-attendance", h.GetMyAttendance)
-	class.Post("/attendance/start", authMiddleware)
 
 	r.Get("/ws", UpgradeGuard(), websocket.New(h.HandleWebSocket))
 

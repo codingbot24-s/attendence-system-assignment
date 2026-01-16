@@ -473,17 +473,17 @@ func (h *handler) GetMyAttendance(c fiber.Ctx) error {
 }
 
 type attendanceReq struct {
-	ClassId string `json:"classid"`
+	ClassId int `json:"classid"`
 }
 
 type ActiveSession struct {
 	ClassId   uint
 	StartedAt int64
 	// Attendance is map
-	Attendance map[uint]string
+	Attendance map[string]string
 }
 
-var ac *ActiveSession
+var ac ActiveSession
 
 func (h *handler) StartAttendance(c fiber.Ctx) error {
 	userId := c.Locals("userid").(uint)
@@ -524,13 +524,11 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 		})
 	}
 
-	// start attendance session in memory
-
+	// TODO: FIX (note) --> nil pointer deref map is not initialize
 	ac.ClassId = class.ID
 	ac.StartedAt = time.Now().Unix()
-	ac.Attendance = make(map[uint]string)
+	ac.Attendance = make(map[string]string)
 
-	
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": "true",
 		"data": fiber.Map{
@@ -542,35 +540,37 @@ func (h *handler) StartAttendance(c fiber.Ctx) error {
 
 var wg sync.WaitGroup
 
-
 type Clients struct {
-	Client map[*websocket.Conn]bool
+	Client  map[*websocket.Conn]bool
 	message chan []byte
 }
-// NOTE NO MUTEX 
+
+// NOTE NO MUTEX
 var clients *Clients
 
-func New () *Clients {
-	return &Clients {
-		Client: make(map[*websocket.Conn]bool),
+func New() *Clients {
+	return &Clients{
+		Client:  make(map[*websocket.Conn]bool),
 		message: make(chan []byte),
 	}
 }
 
-func (c * Clients) addClients (client *websocket.Conn) {
+func (c *Clients) addClients(client *websocket.Conn) {
 	fmt.Println("adding client")
 	c.Client[client] = true
 	fmt.Printf("len client %d", len(c.Client))
 }
 
+
+
 /*
-	TODO: 
-	1. need to create a diffrent message struct for dif events 
-	2. pass it to the diffrent handler
-*/ 
+TODO:
+1. need to create a diffrent message struct for dif events
+2. pass it to the diffrent handler
+*/
 type Incoming struct {
-	Event string `json:"event"`
-	Data interface{} `json:"data"`
+	Event string      `json:"event"`
+	Data  interface{} `json:"data"`
 }
 
 func (h *handler) HandleWebSocket(c *websocket.Conn) {
@@ -581,7 +581,7 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 	clients.addClients(c)
 	// this is blocking so we need to run it in a goroutine
 	go func() {
-		
+
 		// defer wg.Done()
 		for {
 			_, msg, err := c.ReadMessage()
@@ -590,24 +590,24 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 				break
 			}
 			fmt.Printf("received message: %s\n", msg)
-			// we can unmarshall this message in our 
-			if err := Unmarshall(msg,c); err != nil {
+			// we can unmarshall this message in our
+			if err := Unmarshall(msg, c); err != nil {
 				fmt.Printf("error %v\n", err)
 				break
 			}
 			clients.message <- msg
-			// removed write 
+			// removed write
 		}
 	}()
-
 
 	// this is blocking
 	for msg := range clients.message {
 		for c := range clients.Client {
-			c.WriteMessage(websocket.TextMessage,msg)
+			c.WriteMessage(websocket.TextMessage, msg)
 		}
 	}
 	// wg.Add(1)
 	// wg.Wait()
 }
-// TODO: 
+
+// TODO:
