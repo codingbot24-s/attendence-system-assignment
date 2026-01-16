@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -26,7 +27,6 @@ type MyCustomClaims struct {
 	UserId uint
 	jwt.RegisteredClaims
 }
-
 
 func CreateJWTToken(userId uint) (string, error) {
 
@@ -83,11 +83,9 @@ func authMiddleware(c fiber.Ctx) error {
 	return c.Next()
 }
 
-
-
 type WsUser struct {
 	UserId uint
-	Role string
+	Role   string
 }
 
 func UpgradeGuard() fiber.Handler {
@@ -97,25 +95,58 @@ func UpgradeGuard() fiber.Handler {
 			if token == "" {
 				// 1. --> extract the query params
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-					"success" : "false",
-					"message" : "no token",
+					"success": "false",
+					"message": "no token",
 				})
 			}
-			// 2. --> Verify JWT 
-			claims,err := verifyToken(token)
+			// 2. --> Verify JWT
+			claims, err := verifyToken(token)
 			if err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-					"success" : "false",
-					"message" : "invalid token",
-				})	
+					"success": "false",
+					"message": "invalid token",
+				})
 			}
-			// 3. --> Attach user info to websocket 
+			// 3. --> Attach user info to websocket
 			c.Locals("wsuser", &WsUser{
 				UserId: claims.UserId,
-				Role: "student",
+				Role:   "student",
 			})
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
 	}
+}
+
+
+type Data struct {
+	StudentId string
+	Status    string
+}
+
+func AMarkedHandler (c *websocket.Conn, data* Data) {
+	fmt.Println("attendance marker called")
+}
+
+func Unmarshall(message []byte,c* websocket.Conn) error {
+	var req Incoming
+	if err := json.Unmarshal(message, &req); err != nil {
+		return fmt.Errorf("error marshalling into strcut")
+	}
+
+	switch req.Event {
+	case "ATTENDANCE_MARKED":
+		// TODO: error here fix by marshall and unmarshall 
+		dataBytes, err := json.Marshal(req.Data)
+		if err != nil {
+			return fmt.Errorf("error marshalling data")
+		}
+		var data Data
+		if err := json.Unmarshal(dataBytes, &data); err != nil {
+			return fmt.Errorf("error unmarshalling into data struct: %v", err)
+		}
+		AMarkedHandler(c,&data)
+	}
+
+	return nil
 }

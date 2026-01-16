@@ -565,9 +565,9 @@ func (c * Clients) addClients (client *websocket.Conn) {
 	1. need to create a diffrent message struct for dif events 
 	2. pass it to the diffrent handler
 */ 
-type Message struct {
-	Event string 
-	StudentId string
+type Incoming struct {
+	Event string `json:"event"`
+	Data interface{} `json:"data"`
 }
 
 func (h *handler) HandleWebSocket(c *websocket.Conn) {
@@ -587,7 +587,11 @@ func (h *handler) HandleWebSocket(c *websocket.Conn) {
 				break
 			}
 			fmt.Printf("received message: %s\n", msg)
-			
+			// we can unmarshall this message in our 
+			if err := Unmarshall(msg,c); err != nil {
+				fmt.Printf("error %v\n", err)
+				break
+			}
 			clients.message <- msg
 			// removed write 
 		}
