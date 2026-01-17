@@ -219,7 +219,7 @@ func MyAttendanceHandler(c *websocket.Conn, data *Data) error {
 	if !ok || ws == nil {
 		return fmt.Errorf("wsuser missing or wrong type")
 	}
-	// note we dont have call to db for checking after that
+	// note we dont have call to db for checking role
 	// if ws.Role != "teacher" {
 	// 	return fmt.Errorf("only teacher can take attendance")
 	// }
@@ -263,6 +263,20 @@ func MyAttendanceHandler(c *websocket.Conn, data *Data) error {
 	return nil
 }
 
+
+
+// func DoneHandler (c *websocket.Conn, data *Data) error {
+// 	// 1. verify the teacher role
+// 	user := c.Locals("wsuser")
+// 	ws, ok := user.(*WsUser)
+// 	if !ok || ws == nil {
+// 		return fmt.Errorf("wsuser missing or wrong type")
+// 	}
+// 	if ws.Role != "teacher" {
+// 		return fmt.Errorf("only teacher can take attendance")
+// 	}
+// }
+
 func Unmarshall(message []byte, c *websocket.Conn) error {
 	var req Incoming
 	if err := json.Unmarshal(message, &req); err != nil {
@@ -290,6 +304,9 @@ func Unmarshall(message []byte, c *websocket.Conn) error {
 		if err := MyAttendanceHandler(c,&data); err != nil {
 			return err
 		}
+
+	// case "DONE" :
+		
 	default:
 		return fmt.Errorf("unknown event")
 	}
